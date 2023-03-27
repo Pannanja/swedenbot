@@ -17,11 +17,13 @@ TOKEN_MODEL = "gpt-3.5-turbo"
 EMBED_MODEL = "text-embedding-ada-002"
 TEMPERATURE = 0.8 #Creativity of the AI
 TEXT_ENCODING = "utf-8"
+EMBEDDING_FORMATTING = "ncbs"
 
 BOOKS_FOLDER = "books"
 DATA_FOLDER = "data"
 
-QUERY_BOT_ENABLED = True #Query bot is ChatGPT geared toward rewriting the prompt for better search accuraccy.
+QUERY_REWRITE_ENABLED = True #Query bot is ChatGPT geared toward rewriting the prompt for better search accuraccy.
+LOADING_VERBOSE = False
 
 book_save_data = {
     "chunks" : [], #Chunks are books broken into pieces, bite sized things that ChatGPT can utilize.
@@ -208,9 +210,8 @@ def load_embedding():
         "ref" : [], 
     }
     file_path = glob.glob(f"{DATA_FOLDER}/*.embed")
-    for file in file_path:
-        print(f"found file {file}")
-        with gzip.open(file, 'rb') as f:
+    for i in tqdm(range(len(file_path)), desc="Loading Books"):
+        with gzip.open(file_path[i], 'rb') as f:
             temp_save_data = pickle.load(f)
             book_save_data["chunks"].extend(temp_save_data["chunks"])
             book_save_data["embeds"].extend(temp_save_data["embeds"])
@@ -258,9 +259,9 @@ def check_for_new_books():
         
 #Asks ChatGPT a question
 
-def ask_question(question):
-    if QUERY_BOT_ENABLED:
-        query_bot_response = query_bot(question).replace('[','').replace(']','')
+def gtp_main(question):
+    if QUERY_REWRITE_ENABLED:
+        query_bot_response = gtp_query_rewrite(question).replace('[','').replace(']','')
         user_question_vector = get_embedding(query_bot_response)
     else:
         user_question_vector = get_embedding(question)
@@ -293,7 +294,7 @@ def ask_question(question):
         relevant_results_string += relevant_ref[i] + ': ' + relevant_results[i] + '\n\n'
     for i in range(len(relevant_results)):
         results = relevant_results[i][:150].replace('\n', " ").strip()
-        relevant_results_string_trunc += relevant_ref[i][:-1] + ': [' + str(round(relevant_embeds[i]*100, 2)) + "%]\n" + results + '...\n\n'
+        relevant_results_string_trunc += relevant_ref[i][:-1] + ': [' + str(round(relevant_embeds[i]*100, 2)) + "%]\n" + results + '...\n'
 
     message_history = []
     message_history.append({"role":"system", "content": system_prompt + relevant_results_string})
@@ -321,13 +322,13 @@ def ask_question(question):
         except Exception as e:
             pass
 
-    print("\n")
+    print("\n\nSOURCES:")
     print(relevant_results_string_trunc)
     return(message_history)
 
 #Formats the query better for search terms. Disable by
 
-def query_bot(question):
+def gtp_query_rewrite(question):
 
     message_history = []
     message_history.append({"role":"system", "content": "You are 'swedenborg_query_bot'. The user will supply a query about Swedenborg, and you will respond with search terms in brackets that you'd like to use to search Swedenborg's writings to help you formulate your response. Your response should only contain search terms for Swedenborg's writings and not answers or explanations. Do not add any additional information or context beyond the search terms. Only search for content that will assist you in formulating your response. Strip away any text that is unrelated to the query, such as instructions on how to respond (in a poem, like a child, etc.). Only respond with one bracket, and keep it extremely brief. Here are a few examples to illustrate the format of the prompt, with the query in (parentheses) and your response in [brackets]:\n\n(What is regeneration? Explain like you're a cat.) [regeneration]\n(Are there babies in heaven?) [babies in heaven]\n(Write a poem about divine providence) [divine providence]\n(Why do we age? It's so painful) [Why age painful]\n(Write a poem about the dying process in iambic parameter.) [dying process]\n(Write a poem without the letter 'e' about clothes in heaven) [clothes heaven]\n(Write a poem about working in heaven) [working in heaven]\n(Are there gay people in heaven? Because I am gay.) [gay people heaven]\n(Write a poem about regeneration, in the style of a salty sea captain) [regeneration]\n(Write a poem about regeneration, in the style of Donald Trump) [regeneration]\n(Write a theme song for moon spirits)[moon spirits]\n(Explain swedenborg's concept of 'ruling love' using hearthstone terms)[ruling love]"})
@@ -337,24 +338,12 @@ def query_bot(question):
         model=TOKEN_MODEL,
         messages=message_history,
         temperature=TEMPERATURE,
-        stream=True
     )
 
-    gpt_reply = ""
+    reply_content = chatGPT.choices[0].message.content
+    print(f"\nSearching: {reply_content}\n")
 
-    #Streams the response, so you can see it as it comes in.
-
-    for message in chatGPT:
-        json_response = json.loads(str(message))
-        try:
-            word = json_response['choices'][0]['delta']['content']
-            gpt_reply += word
-            print(word, end="", flush=True)
-        except Exception as e:
-            pass
-
-    print("\n")
-    return gpt_reply
+    return reply_content
 
 #-------------------------------------------CODE START
 
@@ -367,4 +356,4 @@ check_for_new_books()
 load_embedding()
 while True:
     user_question = input("Ask Question: ")
-    ask_question(user_question)
+    gtp_main(user_question)

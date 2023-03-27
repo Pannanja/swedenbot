@@ -1,0 +1,11 @@
+In order:
+
+-Ask follow up questions
+-Allow for non-NCBS sources, like blogs
+-Smaller embedding size that goes alongside the larger embedding
+-Add feedback system
+-Use summaries to further teach Swedenbot
+-Have Swedenbot highlight suggested passages
+
+Known issues:
+-NCBS markups can show up in rare cases

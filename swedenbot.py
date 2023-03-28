@@ -210,6 +210,9 @@ def load_embedding():
         "ref" : [], 
     }
     file_path = glob.glob(f"{DATA_FOLDER}/*.embed")
+    if len(file_path) == 0:
+        print("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' foler. Alternatively, message me directly at mattdchilds@gmail.com, I can see if I can get permission to share what I downloaded.")
+        exit()
     for i in tqdm(range(len(file_path)), desc="Loading Books"):
         with gzip.open(file_path[i], 'rb') as f:
             temp_save_data = pickle.load(f)

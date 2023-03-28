@@ -299,7 +299,7 @@ def gtp_main(question):
     message_history = []
     message_history.append({"role":"system", "content": system_prompt + relevant_results_string})
 
-    message_history.append({"role":"user", "content": user_question})
+    message_history.append({"role":"user", "content": question})
 
     #Runs ChatGPT
 

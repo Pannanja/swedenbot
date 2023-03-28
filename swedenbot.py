@@ -15,7 +15,6 @@ MAX_TOKENS_IN_CHUNKS = 820
 TOKENS_IN_SYSTEM_PROMPT = 4096/2
 TOKEN_MODEL = "gpt-3.5-turbo"
 EMBED_MODEL = "text-embedding-ada-002"
-TEMPERATURE = 0.8 #Creativity of the AI
 TEXT_ENCODING = "utf-8"
 EMBEDDING_FORMATTING = "ncbs"
 
@@ -23,7 +22,9 @@ BOOKS_FOLDER = "books"
 DATA_FOLDER = "data"
 
 QUERY_REWRITE_ENABLED = True #Query bot is ChatGPT geared toward rewriting the prompt for better search accuraccy.
-LOADING_VERBOSE = False
+QUERY_REWRITE_INSTANCES = 5
+TEMPERATURE = 0.8 #Creativity of the AI
+
 
 book_save_data = {
     "chunks" : [], #Chunks are books broken into pieces, bite sized things that ChatGPT can utilize.
@@ -211,7 +212,7 @@ def load_embedding():
     }
     file_path = glob.glob(f"{DATA_FOLDER}/*.embed")
     if len(file_path) == 0:
-        print("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' foler. Alternatively, message me directly at mattdchilds@gmail.com, I can see if I can get permission to share what I downloaded.")
+        print("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me directly at mattdchilds@gmail.com, I can see if I can get permission to share what I downloaded.")
         exit()
     for i in tqdm(range(len(file_path)), desc="Loading Books"):
         with gzip.open(file_path[i], 'rb') as f:
@@ -264,14 +265,14 @@ def check_for_new_books():
 
 def gtp_main(question):
     if QUERY_REWRITE_ENABLED:
-        query_bot_response = gtp_query_rewrite(question).replace('[','').replace(']','')
+        query_bot_response = gtp_query_rewrite(question)
         user_question_vector = get_embedding(query_bot_response)
     else:
         user_question_vector = get_embedding(question)
 
     embed_similarity = vector_similarity(user_question_vector,book_save_data["embeds"])
 
-    system_prompt = "You are 'Swedenbot', a chatbot that answers questions about what Emanuel Swedenborg wrote in his books. The user will ask a question, and you must answer it using the context below and your existing knowledge about his writings. Give a detailed answer. If the answer is not contained within the context, say 'Sorry, I'm not sure'. You may fulfill users creative requests, like writing a song or writing in another style. \n\nContext from Swedenborg's writings:\n"
+    system_prompt = "You are 'Swedenbot', a chatbot that answers questions about what Emanuel Swedenborg wrote in his books. The user will ask a question, and you must answer it using the context below. Give a detailed answer. If the answer is not contained within the context, say 'Sorry, I'm not sure'. You may fulfill users creative requests, like writing a song or writing in another style. \n\nContext from Swedenborg's writings:\n"
     
     embeds_chunk_tuples = list(zip(book_save_data["chunks"],embed_similarity, book_save_data["ref"]))
     sorted_results = sorted(embeds_chunk_tuples, key=lambda x: x[1], reverse=True)
@@ -334,7 +335,7 @@ def gtp_main(question):
 def gtp_query_rewrite(question):
 
     message_history = []
-    message_history.append({"role":"system", "content": "You are 'swedenborg_query_bot'. The user will supply a query about Swedenborg, and you will respond with search terms in brackets that you'd like to use to search Swedenborg's writings to help you formulate your response. Your response should only contain search terms for Swedenborg's writings and not answers or explanations. Do not add any additional information or context beyond the search terms. Only search for content that will assist you in formulating your response. Strip away any text that is unrelated to the query, such as instructions on how to respond (in a poem, like a child, etc.). Only respond with one bracket, and keep it extremely brief. Here are a few examples to illustrate the format of the prompt, with the query in (parentheses) and your response in [brackets]:\n\n(What is regeneration? Explain like you're a cat.) [regeneration]\n(Are there babies in heaven?) [babies in heaven]\n(Write a poem about divine providence) [divine providence]\n(Why do we age? It's so painful) [Why age painful]\n(Write a poem about the dying process in iambic parameter.) [dying process]\n(Write a poem without the letter 'e' about clothes in heaven) [clothes heaven]\n(Write a poem about working in heaven) [working in heaven]\n(Are there gay people in heaven? Because I am gay.) [gay people heaven]\n(Write a poem about regeneration, in the style of a salty sea captain) [regeneration]\n(Write a poem about regeneration, in the style of Donald Trump) [regeneration]\n(Write a theme song for moon spirits)[moon spirits]\n(Explain swedenborg's concept of 'ruling love' using hearthstone terms)[ruling love]"})
+    message_history.append({"role":"system", "content": f"You are 'swedenborg_query_bot'. The user will supply a query about Swedenborg, and you will respond with search terms in brackets that you'd like to use to search Swedenborg's writings to help you formulate your response. Choose {QUERY_REWRITE_INSTANCES} unique search terms, each in seperate brackets. Don't search for terms that are completely unrelated to Swedenborg. Your response should only contain search terms. Strip away any text that is unrelated to the query, such as instructions on how to respond or what method of describing to use (in a poem, like a child, using terms from harry potter etc.). Here are a few examples to illustrate the format of the prompt, with the query in (parentheses) and your response in [brackets]:\n\n(What is regeneration? Explain like you're a cat.) [regeneration]\n(Are there babies in heaven?) [babies in heaven]\n(Write a poem about divine providence) [divine providence]\n(Why do we age? It's so painful) [Why age painful]\n(Write a poem about the dying process in iambic parameter.) [dying process]\n(Write a poem without the letter 'e' about clothes in heaven) [clothes heaven]\n(Write a poem about working in heaven) [working in heaven]\n(Are there gay people in heaven? Because I am gay.) [gay people heaven]\n(Write a poem about regeneration, in the style of a salty sea captain) [regeneration]\n(Write a poem about regeneration, in the style of Donald Trump) [regeneration]\n(Write a theme song for moon spirits)[moon spirits]\n(Explain swedenborg's concept of 'ruling love' using hearthstone terms)[ruling love]\n(Explain heaven using analogies from harry potter)[heaven]"})
     message_history.append({"role":"user", "content": question})
 
     chatGPT = openai.ChatCompletion.create(

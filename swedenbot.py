@@ -16,7 +16,7 @@ EMBED_MODEL = "text-embedding-ada-002"
 BOOKS_FOLDER = "books"
 DATA_FOLDER = "data"
 
-QUERY_REWRITE_ENABLED = True #Query bot is ChatGPT geared toward rewriting the prompt for better search accuraccy.
+QUERY_REWRITE_ENABLED = True #Query rewrite is ChatGPT geared toward rewriting the prompt for better search accuraccy.
 QUERY_REWRITE_INSTANCES = 5
 TEMPERATURE = 0.8 #Creativity of the AI
 
@@ -39,7 +39,7 @@ def load_embedding():
     }
     file_path = glob.glob(f"{DATA_FOLDER}/*.embed")
     if len(file_path) == 0:
-        print("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me directly at mattdchilds@gmail.com, I can see if I can get permission to share what I downloaded.")
+        input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
         exit()
     for i in tqdm(range(len(file_path)), desc="Loading Books"):
         with gzip.open(file_path[i], 'rb') as f:
@@ -90,7 +90,7 @@ def gtp_main(question):
 
     embed_similarity = misc.vector_similarity(user_question_vector,book_save_data["embeds"])
 
-    system_prompt = "You are 'Swedenbot', a chatbot that answers questions about what Emanuel Swedenborg wrote in his books. The user will ask a question, and you must answer it using the context below. Give a detailed answer. If the answer is not contained within the context, say 'Sorry, I'm not sure'. You may fulfill users creative requests, like writing a song or writing in another style. \n\nContext from Swedenborg's writings:\n"
+    system_prompt = "You are 'Swedenbot', a chatbot that answers questions about what Emanuel Swedenborg wrote in his books. The user will ask a question, and you must answer it using the context below. Give a detailed answer. If the answer is not contained within the context, say 'Sorry, I'm not sure'. You may fulfill users creative requests, like writing a song or writing in another style. Do not respond with information irrelevant to the user question, even if it's in the context.\n\nContext from Swedenborg's writings:\n"
     
     embeds_chunk_tuples = list(zip(book_save_data["chunks"],embed_similarity, book_save_data["ref"]))
     sorted_results = sorted(embeds_chunk_tuples, key=lambda x: x[1], reverse=True)
@@ -172,7 +172,7 @@ def gtp_query_rewrite(question):
 load_dotenv()
 openai.api_key = os.environ.get("api-token")
 if openai.api_key == None:
-    print("No API key detected. Create a .env file in the same folder as this, and put in it api-token = 'insert token here'. You get your token from https://platform.openai.com/")
+    input("No API key detected. Create a .env file in the same folder as this, and put in it api-token = 'insert token here'. You get your token from https://platform.openai.com/")
     exit()
 check_for_new_books()
 load_embedding()

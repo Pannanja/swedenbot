@@ -1,13 +1,13 @@
 # swedenbot
 A language learning model that can respond to questions about Emanuel Swedenborg's books with references.
 
-You need an API token from OpenAI. Put it into a ".env" file with this format:
+You need an API token from OpenAI. Put it into a ".env" file with this format into the same top level folder as the script:
 
 api-token = "insert-token-here"
 
 Put .txt files from New Christian Bible Study (with markups) into the "books" folder. Run the "swedenbot.py" file.
 
-Then, you can ask Swedenbot questions!
+Then, you can ask Swedenbot questions! Be sure to thank him!
 
 He will give his response, then will return the passages used to formulate the response. 
 

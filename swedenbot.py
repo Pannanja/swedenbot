@@ -2,21 +2,16 @@ from dotenv import load_dotenv
 import glob
 import gzip
 import json
-import math
-import numpy
 import openai
 import os
 import pickle
-import re
-import tiktoken
 from tqdm import tqdm
+from scripts import embed
+from scripts import misc
 
-MAX_TOKENS_IN_CHUNKS = 820
 TOKENS_IN_SYSTEM_PROMPT = 4096/2
 TOKEN_MODEL = "gpt-3.5-turbo"
 EMBED_MODEL = "text-embedding-ada-002"
-TEXT_ENCODING = "utf-8"
-EMBEDDING_FORMATTING = "ncbs"
 
 BOOKS_FOLDER = "books"
 DATA_FOLDER = "data"
@@ -32,174 +27,6 @@ book_save_data = {
     "ref" : [], #Stores reference information (ie "Heaven and Hell 403")
 }
 
-#Gets the embedding value of a piece of text
-
-def get_embedding(text: str):
-    embedding = openai.Embedding.create(
-        input=text,
-        model=EMBED_MODEL,
-    )
-    return embedding["data"][0]["embedding"]
-
-#Counts tokens in input
-
-def token_count(text: str):
-    encoding_model = tiktoken.encoding_for_model(TOKEN_MODEL)
-    return len(encoding_model.encode(text))
-
-#Splits a string evenly into a list of chunks, with none being higher than the constant "MAX_TOKENS_IN_CHUNKS"
-
-def split_string_into_chunks(string: str, seperator: str):
-    num_tokens_in_string = token_count(string)
-    return_length = math.ceil(num_tokens_in_string/MAX_TOKENS_IN_CHUNKS)
-
-    avg_token_per_return_item = num_tokens_in_string/return_length
-
-    sentences = string.split(seperator)
-    return_list = [""]
-    tokens_in_chunk = 0 #Once this hits the constant 'MAX_TOKENS_IN_CHUNKS' , it loops back to zero and starts a new chunk.
-
-    for i, item in enumerate(sentences):
-        num_tokens_in_sentence = token_count(item)
-        if tokens_in_chunk + num_tokens_in_sentence > avg_token_per_return_item:
-            if tokens_in_chunk + num_tokens_in_sentence < MAX_TOKENS_IN_CHUNKS and len(return_list) < return_length:
-                return_list.append(item)
-            else:
-                return_list[-1] += item
-                return_list.append("")
-            tokens_in_chunk = 0
-        else:
-            return_list[-1] += item
-            tokens_in_chunk = token_count(return_list[-1])
-    
-    return return_list
-
-#Creates a readable book name from the name of the file.
-
-def name_book(file_name):
-    book_name = file_name.replace("_", " ").title() #Removes underscores and makes the first letter uppercase
-    book_name = re.sub(r'\[.*?\]', '', book_name).strip() #Removes anything in brackets.
-    return book_name
-
-#Loads and chunks text. Currently only works with NCBS markups.
-
-def chunk_text_from_file(file_name):
-
-    book_name = name_book(file_name)
-
-    file = open(f"{BOOKS_FOLDER}/{file_name}.txt", encoding=TEXT_ENCODING)
-    text = file.read()
-    file.close()
-
-    references_raw, content_raw = format_text_from_ncbs(text,book_name)
-
-    references = []
-    content = []
-
-    #splits chunks that are too large, and appends them all to the new references and content lists.
-    for i, chunk in enumerate(content_raw):
-        chunk_tokens = token_count(chunk)
-        if chunk_tokens > MAX_TOKENS_IN_CHUNKS:
-            chunk_split = split_string_into_chunks(chunk, "\n\n")
-            for splinter in chunk_split:
-                content.append(splinter)
-                references.append(references_raw[i])
-        else:
-            content.append(chunk)
-            references.append(references_raw[i])
-    
-    return content, references
-
-#NCBS text formatting
-
-def format_text_from_ncbs(text, book_name):
-
-    markup_new_section = r'ppp\d+#pid#\d+.'
-    markup_new_section_short = "#pid#"
-    markup_new_subsection = r'ttt\[\d+\] '
-    markup_bible_verse = 'bbb'
-    markup_bible_verse_2 = 'bbbccc'
-    markup_bible_verse_3 = 'ccc'
-    markup_unknown = r"`fff\d+`"
-    markup_unknown_2 = "`qqq`"
-    markup_unknown_3 = "@@@"
-
-    def clean(): #Removes formatting
-        content[-1] = content[-1].replace(markup_unknown_3,"")
-        content[-1] = content[-1].replace(markup_bible_verse,":")
-        content[-1] = content[-1].replace(markup_bible_verse_2,":")
-        content[-1] = content[-1].replace(markup_bible_verse_3,":")
-        content[-1] = content[-1].replace(markup_unknown_2,"")
-        content[-1] = content[-1].replace(markup_unknown_3,"")
-        #content[-1] = re.sub(markup_new_section[:-1],"",content[-1])
-        content[-1] = re.sub(markup_new_section,"",content[-1])
-        content[-1] = re.sub(markup_new_subsection,"",content[-1])
-
-    references = [""]
-    content = [""]
-
-    reference_markup = ""
-    subsection_number = "ttt[1]" #Defaults to [1] when a new section starts
-
-    text_file_lines = re.split("\n\n", text)
-
-
-    #Content formatting, (reference gets formatted a little)
-
-    for i, line in enumerate(text_file_lines):
-
-        #Checks for new section
-
-        if re.search(markup_new_section, line):
-            subsection_number = "ttt[1]"
-
-            reference_markup = re.search(markup_new_section, line).group()
-            references.append(reference_markup[:-1] + subsection_number)
-
-            content.append(line)
-        
-        #Checks for new subsection
-
-        elif re.search(markup_new_subsection, line):
-            subsection_number = re.search(markup_new_subsection, line).group()
-
-            references.append(reference_markup[:-1] + subsection_number)
-
-            content.append(line)
-        
-        else:
-            content[-1] += "\n\n" + line
-        
-        clean()
-
-                    
-
-    #Reference formatting
-
-    for i, item in enumerate(references):
-
-        reference_pid = references[i].find(markup_new_section_short)
-        if reference_pid != -1:
-            references[i] = references[i][reference_pid+len(markup_new_section_short):]
-        
-        references[i] = references[i].replace("ttt","")
-
-        references[i] = book_name + " " + references[i]
-
-    return references, content
-
-#Takes a book text file in the NCBS formatting and embeds them into the "save_data" dictionary
-
-def new_embedding(document_name):
-
-    book_save_data["chunks"], book_save_data["ref"] = chunk_text_from_file(document_name)
-
-    book_save_data["embeds"] = []
-    total_chunks = len(book_save_data["chunks"])
-
-    for i in tqdm (range(total_chunks), desc=f"Embedding {document_name}"):
-        new_embed = get_embedding(book_save_data["chunks"][i])
-        book_save_data["embeds"].append(new_embed)
 
 #Loads pre-made embeddings in the data folder.
 
@@ -220,15 +47,6 @@ def load_embedding():
             book_save_data["chunks"].extend(temp_save_data["chunks"])
             book_save_data["embeds"].extend(temp_save_data["embeds"])
             book_save_data["ref"].extend(temp_save_data["ref"])
-
-#Checks how similar two vectors are, spits out a number between 0 and 1
-
-def vector_similarity(question, vectors):
-    vector_similarity_list = []
-    for item in vectors:
-        result = numpy.dot(numpy.array(question),numpy.array(item))
-        vector_similarity_list.append(result)
-    return vector_similarity_list
 
 #Checks for books that are in the "books" folder, finds which aren't already embedded in the "data" folder, then asks permission to embed new books.
 
@@ -257,7 +75,7 @@ def check_for_new_books():
         
         if user_input.lower() == "y":
             for document_name in new_document_names_list:
-                new_embedding(document_name)
+                book_save_data = embed.new_embedding(document_name, EMBED_MODEL)
                 with gzip.open(f'data/{document_name}.embed', 'wb') as handle:
                     pickle.dump(book_save_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
@@ -266,22 +84,22 @@ def check_for_new_books():
 def gtp_main(question):
     if QUERY_REWRITE_ENABLED:
         query_bot_response = gtp_query_rewrite(question)
-        user_question_vector = get_embedding(query_bot_response)
+        user_question_vector = misc.get_embedding(query_bot_response, EMBED_MODEL)
     else:
-        user_question_vector = get_embedding(question)
+        user_question_vector = misc.get_embedding(question, EMBED_MODEL)
 
-    embed_similarity = vector_similarity(user_question_vector,book_save_data["embeds"])
+    embed_similarity = misc.vector_similarity(user_question_vector,book_save_data["embeds"])
 
     system_prompt = "You are 'Swedenbot', a chatbot that answers questions about what Emanuel Swedenborg wrote in his books. The user will ask a question, and you must answer it using the context below. Give a detailed answer. If the answer is not contained within the context, say 'Sorry, I'm not sure'. You may fulfill users creative requests, like writing a song or writing in another style. \n\nContext from Swedenborg's writings:\n"
     
     embeds_chunk_tuples = list(zip(book_save_data["chunks"],embed_similarity, book_save_data["ref"]))
     sorted_results = sorted(embeds_chunk_tuples, key=lambda x: x[1], reverse=True)
 
-    total_tokens = token_count(system_prompt)
+    total_tokens = misc.token_count(system_prompt)
     prompts = 0   
 
     while total_tokens < TOKENS_IN_SYSTEM_PROMPT:
-        tokens_in_next_prompt = token_count(sorted_results[prompts][0])
+        tokens_in_next_prompt = misc.token_count(sorted_results[prompts][0])
         total_tokens += tokens_in_next_prompt
         if total_tokens < TOKENS_IN_SYSTEM_PROMPT:
             prompts +=1
@@ -335,7 +153,7 @@ def gtp_main(question):
 def gtp_query_rewrite(question):
 
     message_history = []
-    message_history.append({"role":"system", "content": f"You are 'swedenborg_query_bot'. The user will supply a query about Swedenborg, and you will respond with search terms in brackets that you'd like to use to search Swedenborg's writings to help you formulate your response. Choose {QUERY_REWRITE_INSTANCES} unique search terms, each in seperate brackets. Don't search for terms that are completely unrelated to Swedenborg. Your response should only contain search terms. Strip away any text that is unrelated to the query, such as instructions on how to respond or what method of describing to use (in a poem, like a child, using terms from harry potter etc.). Here are a few examples to illustrate the format of the prompt, with the query in (parentheses) and your response in [brackets]:\n\n(What is regeneration? Explain like you're a cat.) [regeneration]\n(Are there babies in heaven?) [babies in heaven]\n(Write a poem about divine providence) [divine providence]\n(Why do we age? It's so painful) [Why age painful]\n(Write a poem about the dying process in iambic parameter.) [dying process]\n(Write a poem without the letter 'e' about clothes in heaven) [clothes heaven]\n(Write a poem about working in heaven) [working in heaven]\n(Are there gay people in heaven? Because I am gay.) [gay people heaven]\n(Write a poem about regeneration, in the style of a salty sea captain) [regeneration]\n(Write a poem about regeneration, in the style of Donald Trump) [regeneration]\n(Write a theme song for moon spirits)[moon spirits]\n(Explain swedenborg's concept of 'ruling love' using hearthstone terms)[ruling love]\n(Explain heaven using analogies from harry potter)[heaven]"})
+    message_history.append({"role":"system", "content": f"You are 'swedenborg_query_bot'. The user will supply a query about Swedenborg, and you will respond with search terms in brackets that you'd like to use to search Swedenborg's writings to help you formulate your response. Choose up to {QUERY_REWRITE_INSTANCES} unique search terms, each in seperate brackets. Don't search for terms that are completely unrelated to Swedenborg. Your response should only contain search terms. Strip away any text that is unrelated to the query, such as instructions on how to respond or what method of describing to use (in a poem, like a child, using terms from harry potter etc.). Here are a few examples to illustrate the format of the prompt, with the query in (parentheses) and your response in [brackets]:\n\n(What is regeneration? Explain like you're a cat.) [regeneration]\n(Are there babies in heaven?) [babies in heaven]\n(Write a poem about divine providence) [divine providence]\n(Why do we age? It's so painful) [Why age painful]\n(Write a poem about the dying process in iambic parameter.) [dying process]\n(Write a poem without the letter 'e' about clothes in heaven) [clothes heaven]\n(Write a poem about working in heaven) [working in heaven]\n(Are there gay people in heaven? Because I am gay.) [gay people heaven]\n(Write a poem about regeneration, in the style of a salty sea captain) [regeneration]\n(Write a poem about regeneration, in the style of Donald Trump) [regeneration]\n(Write a theme song for moon spirits)[moon spirits]\n(Explain swedenborg's concept of 'ruling love' using hearthstone terms)[ruling love]\n(Explain heaven using analogies from harry potter)[heaven]"})
     message_history.append({"role":"user", "content": question})
 
     chatGPT = openai.ChatCompletion.create(

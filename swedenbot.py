@@ -8,6 +8,7 @@ import pickle
 from tqdm import tqdm
 from scripts import embed
 from scripts import misc
+from scripts import summaries
 
 TOKENS_IN_SYSTEM_PROMPT = 4096/2
 TOKEN_MODEL = "gpt-3.5-turbo"
@@ -27,33 +28,31 @@ book_save_data = {
     "ref" : [], #Stores reference information (ie "Heaven and Hell 403")
 }
 
+class BookData:
+    book_save_data = None
 
-#Loads pre-made embeddings in the data folder.
-
-def load_embedding():
-    global book_save_data
-    book_save_data = {
-        "chunks" : [],
-        "embeds" : [], 
-        "ref" : [], 
-    }
-    file_path = glob.glob(f"{DATA_FOLDER}/*.embed")
-    if len(file_path) == 0:
-        input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
+    def __init__(self):
+        if BookData.book_save_data is None:
+            BookData.book_save_data = None
+    
+    def load_embedding(self):
+        embed_file_list = glob.glob(f"{DATA_FOLDER}/*.embed")
+        if len(embed_file_list) == 0:
+            input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
         exit()
-    for i in tqdm(range(len(file_path)), desc="Loading Books"):
-        with gzip.open(file_path[i], 'rb') as f:
-            temp_save_data = pickle.load(f)
-            book_save_data["chunks"].extend(temp_save_data["chunks"])
-            book_save_data["embeds"].extend(temp_save_data["embeds"])
-            book_save_data["ref"].extend(temp_save_data["ref"])
+        for i in tqdm(range(len(embed_file_list)), desc="Loading Books"):
+            with gzip.open(embed_file_list[i], 'rb') as data_from_files:
+                book_save_data = pickle.load(data_from_files)
+
+
+
 
 #Checks for books that are in the "books" folder, finds which aren't already embedded in the "data" folder, then asks permission to embed new books.
 
-def check_for_new_books():
+def embed_new_books(data_folder, book_folder):
 
-    file_path_embed = glob.glob(f"data/*.embed")
-    file_path_book = glob.glob(f"books/*.txt")
+    file_path_embed = glob.glob(f"{data_folder}/*.embed")
+    file_path_book = glob.glob(f"{book_folder}/*.txt")
 
     file_names_embed = []
     file_names_book = []
@@ -78,6 +77,18 @@ def check_for_new_books():
                 book_save_data = embed.new_embedding(document_name, EMBED_MODEL)
                 with gzip.open(f'data/{document_name}.embed', 'wb') as handle:
                     pickle.dump(book_save_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+#Loads pre-made embeddings in the data folder.
+
+def load_embedding():
+    global book_save_data
+    embed_file_list = glob.glob(f"{DATA_FOLDER}/*.embed")
+    if len(embed_file_list) == 0:
+        input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
+        exit()
+    for i in tqdm(range(len(embed_file_list)), desc="Loading Books"):
+        with gzip.open(embed_file_list[i], 'rb') as data_from_files:
+            book_save_data = pickle.load(data_from_files)
         
 #Asks ChatGPT a question
 
@@ -113,11 +124,10 @@ def gtp_main(question):
     relevant_results_string = ''
     relevant_results_string_trunc = ''
     for i in range(len(relevant_results)):
-        relevant_results_string += relevant_ref[i] + ': ' + relevant_results[i] + '\n\n'
-    for i in range(len(relevant_results)):
+        reference = f"{relevant_ref[i][0]} {relevant_ref[i][1]}[{relevant_ref[i][2]}]"
+        relevant_results_string += f"{reference}: {relevant_results[i]} + '\n\n'"
         results = relevant_results[i][:150].replace('\n', " ").strip()
-        relevant_results_string_trunc += relevant_ref[i][:-1] + ': [' + str(round(relevant_embeds[i]*100, 2)) + "%]\n" + results + '...\n'
-
+        relevant_results_string_trunc += f"{reference}: [{str(round(relevant_embeds[i]*100, 2))}%]\n{results}...\n"
     message_history = []
     message_history.append({"role":"system", "content": system_prompt + relevant_results_string})
 
@@ -174,8 +184,9 @@ openai.api_key = os.environ.get("api-token")
 if openai.api_key == None:
     input("No API key detected. Create a .env file in the same folder as this, and put in it api-token = 'insert token here'. You get your token from https://platform.openai.com/")
     exit()
-check_for_new_books()
+embed_new_books(DATA_FOLDER,BOOKS_FOLDER)
 load_embedding()
+#summaries.summarize_chunks(book_save_data["chunks"],book_save_data["ref"])
 while True:
     user_question = input("Ask Question: ")
     gtp_main(user_question)

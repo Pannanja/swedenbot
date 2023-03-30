@@ -6,7 +6,6 @@ from scripts import formatting
 
 MAX_TOKENS_IN_CHUNKS = 820
 TEXT_ENCODING = "utf-8"
-EMBEDDING_FORMATTING = "ncbs"
 
 BOOKS_FOLDER = "books"
 
@@ -29,11 +28,14 @@ def new_embedding(document_name, embed_model):
     for i in tqdm (range(total_chunks), desc=f"Embedding {document_name}"):
         new_embed = misc.get_embedding(book_save_data["chunks"][i], embed_model)
         book_save_data["embeds"].append(new_embed)
+
     return book_save_data
 
 #Loads and chunks text. Currently only works with NCBS markups.
 
 def chunk_text_from_file(file_name):
+
+    chunk_indicator = "\n"
 
     book_name = name_book(file_name)
 
@@ -50,7 +52,7 @@ def chunk_text_from_file(file_name):
     for i, chunk in enumerate(content_raw):
         chunk_tokens = misc.token_count(chunk)
         if chunk_tokens > MAX_TOKENS_IN_CHUNKS:
-            chunk_split = split_string_into_chunks(chunk, "\n\n")
+            chunk_split = split_large_chunk_to_smaller_chunks(chunk, chunk_indicator)
             for splinter in chunk_split:
                 content.append(splinter)
                 references.append(references_raw[i])
@@ -60,17 +62,19 @@ def chunk_text_from_file(file_name):
     
     return content, references
 
-
 #Splits a string evenly into a list of chunks, with none being higher than the constant "MAX_TOKENS_IN_CHUNKS"
 
-def split_string_into_chunks(string: str, seperator: str):
+def split_large_chunk_to_smaller_chunks(string: str, chunk_indicator: str):
     num_tokens_in_string = misc.token_count(string)
     return_length = math.ceil(num_tokens_in_string/MAX_TOKENS_IN_CHUNKS)
 
     avg_token_per_return_item = num_tokens_in_string/return_length
 
-    sentences = string.split(seperator)
+    sentences = string.split(chunk_indicator)
+    sentences = list(filter(lambda x: x != "", sentences))
+
     return_list = [""]
+
     tokens_in_chunk = 0 #Once this hits the constant 'MAX_TOKENS_IN_CHUNKS' , it loops back to zero and starts a new chunk.
 
     for i, item in enumerate(sentences):

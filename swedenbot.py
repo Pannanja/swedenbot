@@ -28,31 +28,12 @@ book_save_data = {
     "ref" : [], #Stores reference information (ie "Heaven and Hell 403")
 }
 
-class BookData:
-    book_save_data = None
-
-    def __init__(self):
-        if BookData.book_save_data is None:
-            BookData.book_save_data = None
-    
-    def load_embedding(self):
-        embed_file_list = glob.glob(f"{DATA_FOLDER}/*.embed")
-        if len(embed_file_list) == 0:
-            input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
-        exit()
-        for i in tqdm(range(len(embed_file_list)), desc="Loading Books"):
-            with gzip.open(embed_file_list[i], 'rb') as data_from_files:
-                book_save_data = pickle.load(data_from_files)
-
-
-
-
 #Checks for books that are in the "books" folder, finds which aren't already embedded in the "data" folder, then asks permission to embed new books.
 
-def embed_new_books(data_folder, book_folder):
+def check_for_new_books_and_embed():
 
-    file_path_embed = glob.glob(f"{data_folder}/*.embed")
-    file_path_book = glob.glob(f"{book_folder}/*.txt")
+    file_path_embed = glob.glob(f"{DATA_FOLDER}/*.embed")
+    file_path_book = glob.glob(f"{BOOKS_FOLDER}/*.txt")
 
     file_names_embed = []
     file_names_book = []
@@ -87,8 +68,11 @@ def load_embedding():
         input("No books detected. Download markup files from New Christian Bible Study and put them in the 'books' folder. Alternatively, message me for an email of the files.")
         exit()
     for i in tqdm(range(len(embed_file_list)), desc="Loading Books"):
-        with gzip.open(embed_file_list[i], 'rb') as data_from_files:
-            book_save_data = pickle.load(data_from_files)
+        with gzip.open(embed_file_list[i], 'rb') as f:
+            temp_save_data = pickle.load(f)
+            book_save_data["chunks"].extend(temp_save_data["chunks"])
+            book_save_data["embeds"].extend(temp_save_data["embeds"])
+            book_save_data["ref"].extend(temp_save_data["ref"])
         
 #Asks ChatGPT a question
 
@@ -184,7 +168,7 @@ openai.api_key = os.environ.get("api-token")
 if openai.api_key == None:
     input("No API key detected. Create a .env file in the same folder as this, and put in it api-token = 'insert token here'. You get your token from https://platform.openai.com/")
     exit()
-embed_new_books(DATA_FOLDER,BOOKS_FOLDER)
+check_for_new_books_and_embed()
 load_embedding()
 #summaries.summarize_chunks(book_save_data["chunks"],book_save_data["ref"])
 while True:

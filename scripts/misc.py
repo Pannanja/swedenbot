@@ -1,7 +1,10 @@
-import tiktoken
-import openai
+import glob
+import gzip
 import numpy
-
+import openai
+import os
+import pickle
+import tiktoken
 
 TOKEN_MODEL = "gpt-3.5-turbo"
 
@@ -28,3 +31,18 @@ def vector_similarity(question, vectors):
         result = numpy.dot(numpy.array(question),numpy.array(item))
         vector_similarity_list.append(result)
     return vector_similarity_list
+
+#Compares two lists of files, and returns the ones in the second one not in the first
+
+def find_unproccessed_files(unprocessed_folder: str, processed_folder: str):
+    processed_files = {os.path.basename(file).split(".")[0] for file in glob.glob(f"{processed_folder}/*.*")}
+    unprocessed_files = {os.path.basename(file).split(".")[0] for file in glob.glob(f"{unprocessed_folder}/*.*")}
+    new_unprocessed_files = list(unprocessed_files - processed_files)
+    return new_unprocessed_files
+
+#Saves embeds
+
+def save_file(data, file_name: str, save_folder: str, extension: str):
+    with gzip.open(f'{save_folder}/{file_name}.{extension}', 'wb') as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+

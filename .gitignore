@@ -130,5 +130,5 @@ dmypy.json
 
 #Matt's Cool Ignores
 .env
-*.embed
-*.txt
+data/*
+books/*

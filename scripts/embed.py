@@ -3,12 +3,13 @@ import re
 from tqdm import tqdm
 from scripts import misc
 from scripts import formatting
+from scripts.config import config
+import sys
 
 MAX_TOKENS_IN_CHUNKS = 820
 TEXT_ENCODING = "utf-8"
 
 BOOKS_FOLDER = "books"
-
 
 book_save_data = {
     "chunks" : [], #Chunks are books broken into pieces, bite sized things that ChatGPT can utilize.
@@ -18,7 +19,7 @@ book_save_data = {
 
 #Takes a book text file and embeds them into the "save_data" dictionary
 
-def new_embedding(document_name, openai_properties):
+def new_embedding(document_name):
 
     book_save_data["chunks"], book_save_data["ref"] = chunk_text_from_file(document_name)
 
@@ -26,7 +27,7 @@ def new_embedding(document_name, openai_properties):
     total_chunks = len(book_save_data["chunks"])
 
     for i in tqdm (range(total_chunks), desc=f"Embedding {document_name}"):
-        new_embed = misc.get_embedding(book_save_data["chunks"][i], openai_properties["embed_model"])
+        new_embed = misc.get_embedding(book_save_data["chunks"][i])
         book_save_data["embeds"].append(new_embed)
 
     return book_save_data

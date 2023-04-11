@@ -2,9 +2,21 @@ import json
 import openai
 from scripts.config import config
 from scripts import misc
-import sys
 
 MAX_TOKENS = 4096
+
+def ask_question(user_question, save_data_cache, system_prompts):
+    query_rewrite = config.getboolean('chatbot','query_rewrite')
+    if query_rewrite:
+        embed_search_terms = chat_gpt(system_prompts["query_rewrite"], user_question, None)[0]
+    else:
+        embed_search_terms = user_question
+    sorted_embeds = misc.find_relevant_embeds(embed_search_terms, save_data_cache)
+    system_prompt_with_embeds, relevant_results = misc.append_embeds(sorted_embeds, system_prompts["swedenbot"])
+    gtp_reply = chat_gpt(system_prompt_with_embeds, user_question, None)[0]
+    print(relevant_results)
+    return(gtp_reply)
+
 
 def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list):
     token_model = config.get('openai_properties','token_model')
@@ -13,19 +25,13 @@ def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list):
     if prev_message_history == None:
         message_history = [{"role":"system", "content": system_prompt}]
         message_history.append({"role":"user", "content": user_input})
-        #tokens_left = MAX_TOKENS - misc.token_count(system_prompt)
     else:
         message_history = prev_message_history
-        #message_history[0] = [{"role":"system", "content": system_prompt}]
-        #tokens_left = MAX_TOKENS
-        #for i, item in enumerate(prev_message_history):
-            #tokens_left -= misc.token_count(prev_message_history[i]["content"])
     chatGPT = openai.ChatCompletion.create(
         model=token_model,
         messages=message_history,
         temperature=temperature,
         stream=stream,
-        #max_tokens=tokens_left-20, #Maybe the token count gives an estimate? -20 fixes errors.
     )
     if stream:
         gpt_reply = ""
@@ -33,6 +39,7 @@ def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list):
             json_response = json.loads(str(message))
             try:
                 word = json_response['choices'][0]['delta']['content']
+                #yield word
                 gpt_reply += word
                 print(word, end="", flush=True)
             except Exception as e:

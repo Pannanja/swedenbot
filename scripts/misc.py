@@ -6,7 +6,12 @@ import openai
 import os
 import pickle
 import tiktoken
-import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dotenv import load_dotenv, set_key
+from scripts import multi_threading
+
+
+
 
 
 #Gets the embedding value of a piece of text
@@ -29,10 +34,9 @@ def token_count(text: str):
 #Checks how similar two vectors are, spits out a number between 0 and 1
 
 def vector_similarity(question, vectors):
-    vector_similarity_list = []
-    for item in vectors:
-        result = numpy.dot(numpy.array(question),numpy.array(item))
-        vector_similarity_list.append(result)
+    question_np = numpy.asarray(question)
+    vectors_np = numpy.asarray(vectors)
+    vector_similarity_list = numpy.dot(vectors_np, question_np)
     return vector_similarity_list
 
 #Compares two lists of files, and returns the ones in the second one not in the first
@@ -52,6 +56,13 @@ def save_file(data, file_name: str):
     extension = config.get('data','embed_ext')
     with gzip.open(f'{save_folder}/{file_name}.{extension}', 'wb') as handle:
         pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+#Loads Embeds
+
+def load_embedded_file(embed_file):
+    with gzip.open(embed_file, 'rb') as file:
+        temp_save_data = pickle.load(file)
+    return temp_save_data
 
 #Compares the search term to all embeds in a list, and retruns the embedded data sorted
 
@@ -78,12 +89,18 @@ def append_embeds(sorted_embeds: list, system_prompt: str):
 
     relevant_results_string = ''
     relevant_results_string_trunc = ''
+    source_character_limit = int(config.get('chatbot','source_character_limit'))
 
     for i in range(len(relevant_content)):
         reference = f"{relevant_ref[i][0]} {relevant_ref[i][1]}[{relevant_ref[i][2]}]"
         relevant_results_string += f"{reference}: {relevant_content[i]} + '\n\n'"
-        #trunc_content = relevant_content[i][:150].replace('\n', " ").strip()
-        relevant_results_string_trunc += f"{reference}\n"
+        trunc_content = relevant_content[i][:source_character_limit].replace('\n', " ").strip()
+        relevant_results_string_trunc += f"{reference}\n{trunc_content}...\n"
 
     system_prompt_with_embeds = system_prompt + relevant_results_string
     return system_prompt_with_embeds, relevant_results_string_trunc
+
+def combine_similar_dict(dict_a, dict_b):
+    for key in dict_a:
+        dict_a[key].extend(dict_b[key])
+    return dict_a

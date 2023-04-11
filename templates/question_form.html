@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Flask Chatbot Example</title>
+  </head>
+  <body>
+    <h1>Chatbot</h1>
+    <form method="POST" action="/">
+      <label for="user_question">Enter your question:</label>
+      <input type="text" name="user_question" id="user_question"><br><br>
+      <input type="submit" value="Submit">
+    </form>
+    <br><br>
+    <div id="response"></div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+      $('form').submit(function(event) {
+        event.preventDefault();
+        var formData = $(this).serialize();
+        $.ajax({
+          type: 'POST',
+          url: '/',
+          data: formData,
+          success: function(response) {
+            $('#response').html(response);
+          },
+          error: function(response) {
+            alert('Error: ' + response.responseText);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

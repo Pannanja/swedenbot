@@ -3,7 +3,16 @@ import re
 #NCBS text formatting
 
 def format_text(text, book_name):
-    references, content = format_text_from_ncbs(text, book_name)
+    markups = {
+        'ncbs' : re.compile(r'\d+#pid#'),
+        'bible' : "Genesis"
+    }
+
+    first_line = re.split("\n", text)[0].strip()
+    if markups["ncbs"].match(first_line):
+        references, content = format_text_from_ncbs(text, book_name)
+    elif first_line.startswith(markups["bible"]):
+        references, content = format_text_from_bible(text, book_name)
     return references, content
 
 def format_text_from_ncbs(text, book_name):
@@ -49,3 +58,38 @@ def format_text_from_ncbs(text, book_name):
         else:
             new_content += "\n\n"
     return references, content    
+
+def format_text_from_bible(text, book_name):
+    text_file_lines = re.split("\n", text)
+
+    last_book = text_file_lines[0].strip()
+    last_chapter = 1
+    last_content = ""
+
+    references = []
+    content = []
+
+    pattern = re.compile(r'(\d+):(\d+) (.+)')
+
+    for i, item in enumerate(text_file_lines):
+        if item.strip() != "":
+            match = re.match(pattern, item)
+            if match:
+                current_chapter = match.group(1)
+                current_verse = match.group(2)
+                current_content = match.group(3)
+                if current_chapter == last_chapter:
+                    last_content = last_content + f"{current_verse}. {current_content}\n"
+                else:
+                    content.append(last_content)
+                    references.append([book_name, last_book, last_chapter])
+                    last_content = f"{current_verse}. {current_content}\n"
+                    last_chapter = current_chapter
+            else:
+                last_book = item.strip()
+
+    return references, content
+                
+
+
+

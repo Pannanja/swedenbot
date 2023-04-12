@@ -10,10 +10,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv, set_key
 from scripts import multi_threading
 
-
-
-
-
 #Gets the embedding value of a piece of text
 
 def get_embedding(text: str):
@@ -88,14 +84,14 @@ def append_embeds(sorted_embeds: list, system_prompt: str):
     relevant_ref = [t[2] for t in sorted_embeds[:prompts]]
 
     relevant_results_string = ''
-    relevant_results_string_trunc = ''
+    relevant_results_string_trunc = []
     source_character_limit = int(config.get('chatbot','source_character_limit'))
 
     for i in range(len(relevant_content)):
         reference = f"{relevant_ref[i][0]} {relevant_ref[i][1]}[{relevant_ref[i][2]}]"
         relevant_results_string += f"{reference}: {relevant_content[i]} + '\n\n'"
         trunc_content = relevant_content[i][:source_character_limit].replace('\n', " ").strip()
-        relevant_results_string_trunc += f"{reference}\n{trunc_content}...\n"
+        relevant_results_string_trunc.append(f"{reference}\n{trunc_content}...")
 
     system_prompt_with_embeds = system_prompt + relevant_results_string
     return system_prompt_with_embeds, relevant_results_string_trunc

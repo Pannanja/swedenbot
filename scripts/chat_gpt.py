@@ -3,22 +3,22 @@ import openai
 from scripts.config import config
 from scripts import misc
 
-MAX_TOKENS = 4096
-
-def ask_question(user_question, save_data_cache, system_prompts):
+def ask_question(user_question, save_data_cache, system_prompts, socketio=None):
     query_rewrite = config.getboolean('chatbot','query_rewrite')
     if query_rewrite:
-        embed_search_terms = chat_gpt(system_prompts["query_rewrite"], user_question, None)[0]
+        embed_search_terms = chat_gpt(system_prompts["query_rewrite"], user_question, None, None)[0]
     else:
         embed_search_terms = user_question
     sorted_embeds = misc.find_relevant_embeds(embed_search_terms, save_data_cache)
     system_prompt_with_embeds, relevant_results = misc.append_embeds(sorted_embeds, system_prompts["swedenbot"])
-    gtp_reply = chat_gpt(system_prompt_with_embeds, user_question, None)[0]
+    gtp_reply = chat_gpt(system_prompt_with_embeds, user_question, None, socketio)[0]
+    if socketio != None:
+        socketio.emit("gpt_response", {"word": "|||", "sources": relevant_results})
     print(relevant_results)
-    return(gtp_reply)
+    return(gtp_reply, relevant_results)
 
 
-def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list):
+def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list, socketio):
     token_model = config.get('openai_properties','token_model')
     temperature = config.getfloat('openai_properties','temperature')
     stream = config.getboolean('openai_properties','streaming')
@@ -39,14 +39,18 @@ def chat_gpt(system_prompt: str, user_input: str, prev_message_history: list):
             json_response = json.loads(str(message))
             try:
                 word = json_response['choices'][0]['delta']['content']
-                #yield word
+                if socketio != None:
+                    socketio.emit("gpt_response", {"word": word})
+                else:
+                    print(word, end="", flush=True)
                 gpt_reply += word
-                print(word, end="", flush=True)
             except Exception as e:
                 pass
         print("")
     else:
         gpt_reply = chatGPT.choices[0].message.content
+        if socketio != None:
+            socketio.emit("gpt_response", {"word": gpt_reply})
         print(gpt_reply)
     message_history.append({"role":"assistant", "content": gpt_reply})
     return(gpt_reply, message_history)

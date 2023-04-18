@@ -67,6 +67,11 @@
 
 </head>
 <body>
+    <div id="temperature-container">
+        <h2>OpenAI Temperature</h2>
+        <input type="range" id="temperature-slider" name="temperature" min="0" max="1" step="0.01" value="0.4">
+        <label for="temperature-slider">Temperature: <span id="temperature-value">0.5</span></label>
+    </div>    
     <h1>Ask Swedenbot</h1>
     <input type="text" id="question" placeholder="Type your question here...">
     <button id="submit">Submit</button>
@@ -79,7 +84,8 @@
     
         $('#submit').click(function() {
             const question = $('#question').val();
-            socket.emit('submit_question', {question: question});
+            const temperature = $('#temperature-slider').val();
+            socket.emit('submit_question', {question: question, temperature: temperature}); // Include the temperature value here
             $('#response').empty(); // Clear the previous response
             responseBuffer = ''; // Reset the response buffer
             responseComplete = false;
@@ -111,6 +117,9 @@
                 responseComplete = false;
             }
         });
-    </script>                        
+        $('#temperature-slider').on('input', function() {
+            $('#temperature-value').text(this.value); // Update the temperature value label
+        });
+    </script>      
 </body>
 </html>

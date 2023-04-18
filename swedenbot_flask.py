@@ -5,16 +5,15 @@ from flask import Flask, render_template
 from dotenv import load_dotenv, set_key
 
 load_dotenv()
-
-
+save_data_cache = init.init_swedenbot()
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-save_data_cache, system_prompts = init.load_and_embed()
-
 @socketio.on("submit_question")
 def handle_question(data):
-    response, relevant_results = chat_gpt.ask_question(data["question"], save_data_cache, system_prompts, socketio)
+    question = data["question"]
+    temperature = float(data["temperature"])
+    chat_gpt.ask_swedenbot(question, save_data_cache, temperature, socketio)
 
 @app.route("/")
 def index():

@@ -14,6 +14,7 @@ class txt_file_watcher(FileSystemEventHandler):
         file_extension = os.path.splitext(event.src_path)[1]
         if file_extension.lower() == ".txt":
             file_name = os.path.basename(event.src_path)
+            print (f"File found: {file_name}\nProcessing...")
             with open(event.src_path, 'r', encoding='utf-8') as file:
                 user_question = file.read()
             response, references = chat_gpt.ask_swedenbot(user_question, save_data_cache, temperature)
@@ -22,7 +23,9 @@ class txt_file_watcher(FileSystemEventHandler):
             output_path = os.path.join(txt_output,file_name)
             with open(output_path, "w", encoding='utf-8') as file:
                 file.write(output)
+            print(f"Response created: {file_name}")
             os.remove(event.src_path)
+            print("Question removed")
         return
 
 software_model = config.get('model','software_model')
@@ -44,6 +47,7 @@ elif software_model == "txt_file_input":
     observer = Observer()
     observer.schedule(event_handler,txt_input, recursive=False)
     observer.start()
+    print("Waiting for input...")
     while True:
         time.sleep(1)
 

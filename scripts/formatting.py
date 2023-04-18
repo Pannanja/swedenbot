@@ -1,21 +1,9 @@
 import re
 
-#NCBS text formatting
 
-def format_text(text, book_name):
-    markups = {
-        'ncbs' : re.compile(r'\d+#pid#'),
-        'bible' : "Genesis"
-    }
-
-    first_line = re.split("\n", text)[0].strip()
-    if markups["ncbs"].match(first_line):
-        references, content = format_text_from_ncbs(text, book_name)
-    elif first_line.startswith(markups["bible"]):
-        references, content = format_text_from_bible(text, book_name)
-    return references, content
-
-def format_text_from_ncbs(text, book_name):
+def ncbs(text, book_name):
+    """
+    """
     text_file_lines = re.split("\n", text)
 
     references = []
@@ -59,7 +47,7 @@ def format_text_from_ncbs(text, book_name):
             new_content += "\n\n"
     return references, content    
 
-def format_text_from_bible(text, book_name):
+def bible(text, book_name):
     text_file_lines = re.split("\n", text)
 
     last_book = text_file_lines[0].strip()

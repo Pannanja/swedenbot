@@ -6,11 +6,10 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import os
 import time
+import threading
 
 class txt_file_watcher(FileSystemEventHandler):
-    def on_created(self, event):
-        if event.is_directory:
-            return
+    def process_file(self, event):
         file_extension = os.path.splitext(event.src_path)[1]
         if file_extension.lower() == ".txt":
             file_name = os.path.basename(event.src_path)
@@ -19,7 +18,7 @@ class txt_file_watcher(FileSystemEventHandler):
                 user_question = file.read()
             response, references = chat_gpt.ask_swedenbot(user_question, save_data_cache, temperature)
             references = "\n\n".join(references)
-            output = f"{response}\n\n{references}"
+            output = f"{response}\n\nSources:\n\n{references}"
             output_path = os.path.join(txt_output,file_name)
             with open(output_path, "w", encoding='utf-8') as file:
                 file.write(output)
@@ -27,6 +26,17 @@ class txt_file_watcher(FileSystemEventHandler):
             os.remove(event.src_path)
             print("Question removed")
         return
+    
+    def on_created(self, event):
+        try:
+            if event.is_directory:
+                return
+            processing_thread = threading.Thread(target=self.process_file, args=(event,))
+            processing_thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+        
+
 
 software_model = config.get('model','software_model')
 temperature = float(config.get('openai_properties','temperature'))

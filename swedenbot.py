@@ -1,14 +1,25 @@
-import sys
-from scripts import init
-from scripts import chat_gpt
-from scripts.config import config
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 import os
-import time
+import sys
 import threading
+import time
+
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
+
+from scripts import chat_gpt
+from scripts import init
+from scripts.config import config
 
 class txt_file_watcher(FileSystemEventHandler):
+    def on_created(self, event):
+        try:
+            if event.is_directory:
+                return
+            processing_thread = threading.Thread(target=self.process_file, args=(event,))
+            processing_thread.start()
+        except Exception as e:
+            print(f"Error: {e}")
+    
     def process_file(self, event):
         file_extension = os.path.splitext(event.src_path)[1]
         if file_extension.lower() == ".txt":
@@ -24,25 +35,14 @@ class txt_file_watcher(FileSystemEventHandler):
                 file.write(output)
             print(f"Response created: {file_name}")
             os.remove(event.src_path)
-            print("Question removed")
+            print(f"Question removed: {file_name}")
         return
     
-    def on_created(self, event):
-        try:
-            if event.is_directory:
-                return
-            processing_thread = threading.Thread(target=self.process_file, args=(event,))
-            processing_thread.start()
-        except Exception as e:
-            print(f"Error: {e}")
-        
-
 
 software_model = config.get('model','software_model')
 temperature = float(config.get('openai_properties','temperature'))
 txt_input = config.get('data','txt_input')
 txt_output = config.get('data','txt_output')
-
 save_data_cache = init.init_swedenbot()
 
 if software_model == "ncbs":
@@ -60,4 +60,5 @@ elif software_model == "txt_file_input":
     print("Waiting for input...")
     while True:
         time.sleep(1)
+
 

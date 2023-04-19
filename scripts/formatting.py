@@ -18,6 +18,7 @@ def ncbs(text, book_name):
         'New Reference_1' : ("bbbccc", ":"),
         'New Reference_2' : ("bbb", ":"),
         'New Reference_3' : ("ccc", ":"),
+        'Footnote' : ('`nnn', "")
     }
     
     current_section = 1
@@ -25,7 +26,9 @@ def ncbs(text, book_name):
     new_content = ""
 
     for i, item in enumerate(text_file_lines):
-        if item != "":
+        if item[:4] == markups["Footnote"][0]:
+            pass
+        if item != "" and item[:4] != markups["Footnote"][0]:
             if markups["New Section"][0].search(item) or markups["New Book"][0].search(item) or markups["New Subsection"][0].search(item):
                 references.append([book_name,current_section,current_subsection])
                 for markup in markups:
